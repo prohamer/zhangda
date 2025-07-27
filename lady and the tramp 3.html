@@ -1,0 +1,797 @@
+<!DOCTYPE html>
+		<html>
+		<head>
+
+
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lyrics Player</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 10px;
+            background: #000;  /* 原本是 #f9f9f9 */
+			color: #fff;      /* 加入這行確保文字顏色 */
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            gap: 20px;
+        }
+        .video-container {
+            flex: 2;
+            position: relative;
+            padding-bottom: 56.25%;
+            height: 0;
+            background: #000;
+        }
+		/* 手機版樣式 */
+        @media (max-width: 768px) {
+          .video-container {
+                position: sticky;
+                top: 60px;  /* 加大這個值，配合 Google Sites 的標題列高度 */
+                z-index: 100;
+                margin-bottom: 10px;
+                /* 可能需要額外的 margin-top */
+                margin-top: 60px;  /* 加入這行，確保初始位置也正確 */
+            }
+
+            body {
+               /* 確保有足夠的頂部空間 */
+                 padding-top: 60px;
+            }
+			
+            .container {
+                flex-direction: column;
+                padding-top: 0;
+            }
+        }
+		
+        .video-container iframe {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+        .lyrics-container {
+            flex: 1;
+            height: calc(100vh - 40px);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            background: #1a1a1a;  /* 原本是 white */
+			color: #fff;         /* 加入這行 */
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .lyrics-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 15px;
+            background: #2d2d2d;  /* 原本是 #f0f0f0 */
+			border-bottom: 1px solid #333;  /* 原本是 #ddd */
+            border-bottom: 1px solid #ddd;
+        }
+        .title {
+            font-weight: bold;
+        }
+        .mode-switch {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 50px;
+            height: 24px;
+        }
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 24px;
+        }
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 16px;
+            width: 16px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        input:checked + .slider {
+            background-color: #2196F3;
+        }
+        input:checked + .slider:before {
+            transform: translateX(26px);
+        }
+        .mode-label {
+            font-size: 0.9em;
+            color: #ccc;  /* 原本是 #666 */
+        }
+        #lyricsDisplay {
+            flex: 1;
+            overflow-y: auto;
+            padding: 15px;
+        }
+        .lyrics-line {
+            padding: 10px;
+            margin: 5px 0;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: all 0.2s;
+            line-height: 1.4;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+			color: #ccc;  /* 加入這行 */
+        }
+        .lyrics-line:hover {
+            background-color: #333;  /* 原本是 #f0f0f0 */
+        }
+        .lyrics-line.active {
+            background-color: #2196F3;  /* 可以保留藍色或改成 #1a1a1a */
+			color: #fff;  /* 加入這行 */
+            font-weight: bold;
+        }
+        .loop-btn {
+            padding: 5px;
+            border: none;
+            background: none;
+            cursor: pointer;
+            opacity: 0.5;
+            transition: all 0.2s;
+            color: #c79ac5;  /* 原本是 #666 */
+        }
+        .loop-btn:hover {
+            opacity: 1;
+        }
+        .loop-btn.active {
+            color: #ec21f3;
+            opacity: 1;
+        }
+        .lyrics-text {
+            flex: 1;
+        }
+        @media (max-width: 768px) {
+            .container {
+                flex-direction: column;
+            }
+            .lyrics-container {
+                height: 50vh;
+            }
+        }
+        /* 說明按鈕樣式 */
+        .help-button {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: #2196F3;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 20px;
+            cursor: pointer;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            z-index: 1000;
+            transition: all 0.3s ease;
+        }
+		.help-button:hover {
+            background: #1976D2;
+            transform: translateY(-2px);
+        }
+        /* 說明面板樣式 */
+        .help-panel {
+            position: fixed;
+            bottom: -100%;
+            left: 0;
+            right: 0;
+            background: white;
+            padding: 20px;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+            transition: bottom 0.3s ease;
+            z-index: 999;
+            max-height: 80vh;
+            overflow-y: auto;
+			color: #000;
+        }
+        .help-panel.show {
+            bottom: 0;
+        }
+        .help-content {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .help-section {
+            margin-bottom: 20px;
+        }
+        .help-section h3 {
+            color: #2196F3;
+            margin-bottom: 10px;
+        }
+        .help-list {
+            list-style: none;
+            padding: 0;
+        }
+        .help-list li {
+            margin: 10px 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .help-icon {
+            color: #666;
+            width: 24px;
+            text-align: center;
+        }
+        .close-help {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #666;
+        }
+        .backdrop {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+            z-index: 998;
+        }
+        .backdrop.show {
+            opacity: 1;
+            visibility: visible;
+        }
+        @media (max-width: 768px) {
+            .help-panel {
+                max-height: 70vh;
+            }
+        }
+    </style>
+
+
+    <div class="container">
+        <div class="video-container">
+            <div id="player"></div>
+        </div>
+        <div class="lyrics-container">
+            <div class="lyrics-header">
+                <div class="title">字幕同步播放器</div>
+                <div class="mode-switch">
+                    <span class="mode-label">自動播放模式</span>
+                    <label class="switch">
+                        <input type="checkbox" id="modeToggle" checked="">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+            </div>
+            <div id="lyricsDisplay"></div>
+        </div>
+    </div>
+    <!-- 說明按鈕 -->
+    <button class="help-button" onclick="toggleHelp()">
+        <i class="fas fa-question-circle"></i>
+        使用說明
+    </button>
+    <!-- 背景遮罩 -->
+    <div class="backdrop" onclick="toggleHelp()"></div>
+    <!-- 說明面板 -->
+    <div class="help-panel">
+        <button class="close-help" onclick="toggleHelp()">×</button>
+        <div class="help-content">
+		<div class="help-section">
+                <h3>播放模式</h3>
+                <ul class="help-list">
+                    <li>
+                        <i class="fas fa-play-circle help-icon"></i>
+                        <span>自動播放模式：影片會連續播放，歌詞自動跟隨（預設模式）</span>
+                    </li>
+                    <li>
+                        <i class="fas fa-chalkboard-teacher help-icon"></i>
+                        <span>關閉自動播放模式：進入單句教學模式，點擊歌詞只播放單句，播完自動暫停</span>
+                    </li>
+                    <li>
+                        <i class="fas fa-toggle-on help-icon"></i>
+                        <span>使用右上角的開關切換模式</span>
+                    </li>
+                </ul>
+            </div>
+            <div class="help-section">
+                <h3>歌詞控制</h3>
+                <ul class="help-list">
+                    <li>
+                        <i class="fas fa-mouse-pointer help-icon"></i>
+                        <span>點擊任何歌詞行可跳轉到該位置</span>
+                    </li>
+                    <li>
+                        <i class="fas fa-sync-alt help-icon"></i>
+                        <span>點擊歌詞前的循環按鈕可重複播放該句</span>
+                    </li>
+                    <li>
+                        <i class="fas fa-sync-alt help-icon" style="color: #2196F3;"></i>
+                        <span>藍色圖標表示該句正在循環播放中</span>
+                    </li>
+                </ul>
+            </div>
+            <div class="help-section">
+                <h3>教學模式使用技巧</h3>
+                <ul class="help-list">
+                    <li>
+                        <i class="fas fa-graduation-cap help-icon"></i>
+                        <span>適合逐句講解與練習</span>
+                    </li>
+                    <li>
+                        <i class="fas fa-redo help-icon"></i>
+                        <span>可配合循環按鈕反覆練習困難句子</span>
+                    </li>
+                    <li>
+                        <i class="fas fa-hand-point-up help-icon"></i>
+                        <span>點擊下一句繼續播放</span>
+                    </li>
+                </ul>
+            </div>
+            <div class="help-section">
+                <h3>自動播放模式使用技巧</h3>
+                <ul class="help-list">
+                    <li>
+                        <i class="fas fa-music help-icon"></i>
+                        <span>適合完整聆聽歌曲</span>
+                    </li>
+                    <li>
+                        <i class="fas fa-scroll help-icon"></i>
+                        <span>歌詞會自動捲動並高亮</span>
+                    </li>
+                    <li>
+                        <i class="fas fa-random help-icon"></i>
+                        <span>可隨時點擊歌詞跳轉</span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    <script>
+        let player;
+        let currentInterval;
+        let loopingIndex = -1;
+        let isLooping = false;
+        let isContinuousMode = true;
+
+        // 歌詞數據
+        let lyrics = [
+        { time: 0.4, text: `get too serious. After all, at a time like this, there's--` },
+    { time: 4.4, text: `Oh, yes, you see, Miss Lady, there comes a time in the life of all humans when, well, as they put it, uh, the birds and the bees.` },
+    { time: 17.4, text: `Or, well, uh, the stork, you know, uh, no...` },
+    { time: 24.8, text: `Well, and... What he's trying to say, lassie, is,` },
+    { time: 28.1, text: `Darling is expecting a wee bairn.` },
+    { time: 31.5, text: `Bairn?` },
+    { time: 32.7, text: `He means a baby, Miss Lady.` },
+    { time: 35.7, text: `Oh.` },
+    { time: 37.8, text: `What's a baby?` },
+    { time: 40.2, text: `Well, they-- they resemble humans.` },
+    { time: 43.3, text: `But I'd say a mite smaller.` },
+    { time: 46.3, text: `Aye, and they walk on all fours.` },
+    { time: 48.4, text: `And if I remember correctly, they beller a lot.` },
+    { time: 52.6, text: `Aye, and they're very expensive.` },
+    { time: 55.9, text: `You will not be permitted to play with it.` },
+    { time: 58.3, text: `But they're mighty sweet.` },
+    { time: 61.0, text: `And very, very soft.` },
+    { time: 63.7, text: `Just a cute little bundle of trouble.` },
+    { time: 68.3, text: `Yeah.` },
+    { time: 69.2, text: `They scratch, pinch, pull ears, ah, but shucks, any dog can take that.` },
+    { time: 74.3, text: `It's what they do to your happy home.` },
+    { time: 76.7, text: `Move it over, will you, friend?` },
+    { time: 78.3, text: `Homewreckers, that's what they are.` },
+    { time: 79.8, text: `Look here, laddie, who are you to barge in?` },
+    { time: 82.1, text: `The voice of experience, Buster.` },
+    { time: 85.3, text: `Boy, just wait'll Junior gets here.` },
+    { time: 88.8, text: `You get the urge for a nice, comfortable scratch,` },
+    { time: 92.9, text: `and, "Put that dog out. He'll get fleas all over the baby."` },
+    { time: 96.7, text: `You start barking at some strange mutt.` },
+    { time: 98.7, text: `[ barking ]` },
+    { time: 101.0, text: `Stop that racket, you'll wake the baby.` },
+    { time: 104.0, text: `And then, then they hit you in the "room and board" department.` },
+    { time: 109.7, text: `Oh, remember those nice, juicy cuts of beef?` },
+    { time: 115.0, text: `Forget 'em.` },
+    { time: 116.7, text: `Leftover baby food.` },
+    { time: 119.4, text: `And that nice, warm bed by the fire?` },
+    { time: 124.2, text: `[ thunderclap ]` },
+    { time: 127.9, text: `A leaky doghouse.` },
+    { time: 130.4, text: `Oh, dear.` },
+    { time: 131.4, text: `And listen, lassie, no human is that cruel.` },
+    { time: 134.4, text: `Of course not, Miss Lady. Why,` },
+    { time: 137.6, text: `everybody knows a dog's best friend is his human.` },
+    { time: 142.5, text: `[ laughs ]` },
+    { time: 144.5, text: `Oh, come on now, fellas.` },
+    { time: 147.0, text: `Oh, you haven't fallen for that old line now, have you?` },
+    { time: 149.2, text: `Aye, and we've no need for mongrels and their radical ideas.` },
+    { time: 154.4, text: `Off with you now. Off with you. Off with you.` },
+    { time: 156.8, text: `Okay, Sandy.` },
+    { time: 158.0, text: `Her name's Jock.` },
+    { time: 158.9, text: `Okay, Jock. "Laird" of Glen Cairn to you.` },
+    { time: 160.5, text: `Okay, okay, okay.` },
+    { time: 162.9, text: `But remember this, Pigeon, a human heart has only so much room for love and affection.` },
+    { time: 168.8, text: `When a baby moves in, the dog moves out.` },
+    { time: 178.0, text: `Uh-huh.` },
+    { time: 180.3, text: `Oh, let's see. That'll be about...` },
+    { time: 185.0, text: `Oh, well.` },
+    { time: 193.3, text: `Darling, there isn't any way we can tell for sure what it's going to be, is there?` },
+    { time: 199.3, text: `I'm afraid not.` },
+    { time: 201.2, text: `Nobody ever knows for certain.` },
+    { time: 203.6, text: `All we can do is hope.` },
+    { time: 213.7, text: `[ clock chimes ]` },
+    { time: 217.2, text: `[ groans ]` },
+    { time: 226.4, text: `[ siren wailing ]` },
+    { time: 232.1, text: `Darling, are you sure you want watermelon? Mhm. Oh, and some chop suey, too.` },
+    { time: 240.8, text: `Chop suey?` },
+    { time: 242.3, text: `Oh, all right, darling.` },
+    { time: 245.2, text: `[ tires screeching ]` },
+    { time: 248.8, text: `[ siren wailing ]` },
+    { time: 252.7, text: `What an adorable little booties. Isn't it just too adorable? Don't you just love a shower? Darling, I've never seen you look more beautiful. It's just absolutely radiant.` },
+    { time: 267.2, text: `Radiant? Why, that's just what I told Bill yesterday. Bill, I said, darling looks radiant, positively radiant.` },
+    { time: 271.0, text: `Why, in all my days, I said, I've never seen anyone as radiant as Darling has been...` },
+    { time: 278.5, text: `- You look terrible. - Absolutely horrible.` },
+    { time: 280.3, text: `- I never saw you look worse. - Cheer up, Jim.` },
+    { time: 282.0, text: `- Cheer up, Jim. - Old Doc Jones has never lost a father yet.` },
+    { time: 284.7, text: `Old Doc Jones has never lost a father yet.` },
+    { time: 293.4, text: `[ siren wailing ]` },
+    { time: 300.3, text: `Yes, operator, it's a boy! Uh-huh, a boy.` },
+    { time: 302.1, text: `And he-- What's that? Eyes?` },
+    { time: 306.2, text: `Oh, what color are they? Well, oh gosh,` },
+    { time: 308.5, text: `I-I forgot to look.` },
+    { time: 313.2, text: `A boy! It's a boy! It's a doctor!` },
+    { time: 317.5, text: `Doctor, it's a boy.` },
+    { time: 319.3, text: `Yes, yes, I know.` },
+    { time: 321.3, text: `Uh-huh, a boy!` },
+    { time: 323.2, text: `Boy, oh boy.` },
+    { time: 324.6, text: `It's a boy! It's a boy! It's a boy!` },
+    { time: 327.1, text: `Hello? Hello, Jim? I-I... Is that you, Jim?` },
+    { time: 331.0, text: `Central? Central, we've been cut off.` },
+    { time: 333.0, text: `Hello? Hello? Hello? Hello?` },
+    { time: 337.7, text: `[ baby crying ]` },
+    { time: 365.2, text: `What is a baby? I just can't understand. It must be something wonderful, it must be something grand.` },
+    { time: 382.1, text: `Cause everybody's smiling in a kind and wistful way.` },
+    { time: 389.9, text: `And they haven't even noticed that I'm around today.` },
+    { time: 398.6, text: `[ woman humming ]` },
+    { time: 410.7, text: `What is a baby anyway?` },
+    { time: 416.3, text: `Oh, what is a baby? I must find out today what makes Jim Dear and Darling act this way.` },
+    { time: 442.1, text: `♪ La la lu ♪ ♪ La la lu ♪ ♪ Oh, my little star sweeper ♪` },
+    { time: 452.2, text: `♪ I'll sweep the stardust for you ♪` },
+    { time: 459.4, text: `♪ La la lu ♪ ♪ La la lu ♪ ♪ Little soft, fluffy sleeper ♪ ♪ Here comes a pink cloud for you ♪` },
+    { time: 475.8, text: `♪ La la lu ♪ ♪ La la lu ♪ ♪ Little wandering angel ♪ ♪ Fold up your wings, close your eyes ♪ ♪ La la lu ♪` },
+    { time: 497.3, text: `♪ La la lu ♪ ♪ And may love be your keeper ♪` },
+    { time: 506.4, text: `♪ La la lu ♪ ♪ La la lu ♪ ♪ La la lu ♪` },
+    { time: 518.2, text: `There now, little star sweeper. Dream on.` },
+    { time: 532.0, text: `♪ [Humming] ♪` },
+    { time: 537.5, text: `Well, that should do it.` },
+    { time: 540.2, text: `Ah, got enough here to take us halfway to China.` },
+    { time: 547.0, text: `Darling.` },
+    { time: 548.8, text: `Darling.` },
+    { time: 550.4, text: `We haven't much time.` },
+    { time: 552.5, text: `Jim, I just can't leave him.` },
+    { time: 554.9, text: `He's still so small and helpless.` },
+    { time: 557.4, text: `He'll be all right.` },
+    { time: 559.2, text: `Now, come on. If he wakes up, we'll never get away.` },
+    { time: 562.5, text: `Jim, I feel so guilty deserting him like this.` },
+    { time: 565.7, text: `Nonsense.` },
+    { time: 569.3, text: `Hey, what's the matter with Lady?` },
+    { time: 572.5, text: `Oh, she thinks we're running out on him.` },
+    { time: 575.7, text: `Ah, don't worry, old girl. We'll be back in a few days.` },
+    { time: 580.0, text: `And Aunt Sarah will be here.` },
+    { time: 581.7, text: `And with you here to help her...` },
+    { time: 584.5, text: `Well, there's the old girl now.` },
+    { time: 587.1, text: `Coming, Aunt Sarah. Coming.` },
+    { time: 589.8, text: `Sorry I'm late, dears. Hope I haven't kept you waiting.` },
+    { time: 592.8, text: `Here, let me take your things.` },
+    { time: 594.2, text: `No, no, no, no, no fussing. I know my way around.` },
+    { time: 597.5, text: `On your way now, mustn't miss your train.` },
+    { time: 599.5, text: `Have a good time, and don't worry about a thing.` },
+    { time: 602.4, text: `Goodbye, dears. Goodbye. Goodbye. Goodbye. Goodbye.` },
+    { time: 604.7, text: `Bye.` },
+    { time: 606.5, text: `Now to see that big nephew of mine.` },
+    { time: 616.1, text: `Oh, kitchy, kitchy, koo.` },
+    { time: 618.5, text: `Ooh, gootchy, gootchy, gootchy, gootchy. Oh, you adorable little--` },
+    { time: 623.8, text: `Good gracious, what are you doing here?` },
+    { time: 626.3, text: `Go on now. Shoo, shoo. Scat. Get out of here.` },
+    { time: 629.6, text: `Oh, there, there.` },
+    { time: 632.1, text: `Auntie won't let that dog frighten you anymore. No, no, no, no, no.` },
+    { time: 635.5, text: `No, no, no, no, no. No, no, no, no, no.` },
+    { time: 638.4, text: `[ woman singing "Rock-a-Bye Baby" ] ♪ Rock-a-bye baby ♪` },
+    { time: 642.8, text: `♪ On the treetop ♪ ♪ When the wind blows ♪` },
+    { time: 646.4, text: `♪ [Continues] ♪` },
+    { time: 648.1, text: `[ cats yowling ]` },
+    { time: 656.3, text: `♪ We are Siamese if you please ♪` },
+    { time: 661.4, text: `♪ We are Siamese if you don't please ♪` },
+    { time: 667.0, text: `♪ Now we lookin' over our new domicile ♪` },
+    { time: 672.8, text: `♪ If we like, we stay for maybe quite a while ♪` },
+    { time: 678.3, text: `[ sniffing ]` },
+    { time: 682.2, text: `[ hissing ]` },
+    { time: 689.0, text: `♪ Do you seeing that thing swimming 'round and 'round? ♪ ♪ Yes ♪` },
+    { time: 694.5, text: `♪ Maybe we could reaching in and make it drown ♪` },
+    { time: 700.1, text: `♪ If we sneaking up upon it carefully ♪` },
+    { time: 704.6, text: `♪ There will be a head for you, a tail for me ♪` },
+    { time: 712.8, text: `[ both meow ]` },
+    { time: 718.9, text: `[ cats meowing ]` },
+    { time: 720.7, text: `[ both screaming ]` },
+    { time: 731.9, text: `♪ Do you hear what I hear? ♪ ♪ A baby cry ♪` },
+    { time: 737.2, text: `♪ Where we finding baby, there are milk nearby ♪` },
+    { time: 742.8, text: `♪ If we look in baby buggy, there could be ♪` },
+    { time: 748.0, text: `♪ Plenty milk for you and also some for me ♪` },
+    { time: 753.7, text: `[ screeches ]` },
+    { time: 756.2, text: `[ both meowing ]` },
+    { time: 762.1, text: `What's going on down there?` },
+    { time: 764.7, text: `Merciful heavens. My darlings, my precious pets.` },
+    { time: 770.8, text: `Oh, that wicked animal.` },
+    { time: 774.4, text: `Attacking my poor, innocent little angels.` },
+    { time: 782.7, text: `Good afternoon, ma'am. What can I do for you?` },
+    { time: 786.9, text: `I want a muzzle, a good, strong muzzle.` },
+    { time: 789.7, text: `Ah yes, ma'am. Now, here's our latest combination leash and muzzle.` },
+    { time: 795.3, text: `Now, we'll just slip it on like this, and--` },
+    { time: 797.8, text: `No, no, no, no, no. Nice doggie. No, no, don't wiggle.` },
+    { time: 800.7, text: `Steady now. Now--` },
+    { time: 802.6, text: `No, no. Careful, you little--` },
+    { time: 805.7, text: `Watch out.` },
+    { time: 807.5, text: `Doggie, careful, doggie.` },
+    { time: 808.9, text: `Come on. No, no.` },
+    { time: 810.7, text: `[ dog whimpering ]` },
+    { time: 818.8, text: `[ whimpering ]` },
+    { time: 833.0, text: `[ whimpering ]` }
+        ];
+		// 載入YouTube API
+        function loadYouTubeAPI() {
+            const tag = document.createElement('script');
+            tag.src = 'https://www.youtube.com/iframe_api';
+            const firstScriptTag = document.getElementsByTagName('script')[0];
+            firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+        }
+
+        // YouTube API 準備完成
+        function onYouTubeIframeAPIReady() {
+            createPlayer('5BKjaCtogp0');
+            displayLyrics();
+        }
+
+        // 建立播放器
+        function createPlayer(videoId) {
+            player = new YT.Player('player', {
+                height: '360',
+                width: '640',
+                videoId: videoId,
+                playerVars: {
+                    modestbranding: 1,
+                    rel: 0
+                },
+                events: {
+                    'onStateChange': onPlayerStateChange,
+                    'onError': onPlayerError
+                }
+            });
+        }
+
+        // 錯誤處理
+        function onPlayerError(event) {
+            console.error('Video player error:', event.data);
+        }
+
+        // 播放狀態改變
+        function onPlayerStateChange(event) {
+            if (event.data === YT.PlayerState.PLAYING) {
+                if (isContinuousMode) {
+                    startTimeUpdate();
+                }
+            } else if (event.data === YT.PlayerState.ENDED) {
+                if (isLooping && loopingIndex !== -1) {
+                    seekTo(lyrics[loopingIndex].time);
+                }
+            } else {
+                stopTimeUpdate();
+            }
+        }
+
+        // 開始循環播放特定句子
+        function startLooping(index) {
+            if (loopingIndex === index) {
+                stopLooping();
+                return;
+            }
+            stopLooping();
+            loopingIndex = index;
+            isLooping = true;
+            updateLoopButtons();
+            seekTo(lyrics[index].time);
+        }
+
+        // 停止循環播放
+        function stopLooping() {
+            loopingIndex = -1;
+            isLooping = false;
+            updateLoopButtons();
+        }
+
+        // 更新循環按鈕狀態
+        function updateLoopButtons() {
+            const buttons = document.querySelectorAll('.loop-btn');
+            buttons.forEach((btn, index) => {
+                if (index === loopingIndex) {
+                    btn.classList.add('active');
+                } else {
+                    btn.classList.remove('active');
+                }
+            });
+        }
+
+        // 開始更新時間
+        function startTimeUpdate() {
+            clearInterval(currentInterval);
+            currentInterval = setInterval(() => {
+                const currentTime = player.getCurrentTime();
+                if (isLooping && loopingIndex !== -1) {
+                    const currentLine = lyrics[loopingIndex];
+                    const nextLine = lyrics[loopingIndex + 1];
+                    if (nextLine && currentTime >= nextLine.time) {
+                        seekTo(currentLine.time);
+                        return;
+                    }
+                }
+                updateActiveLyrics(currentTime);
+            }, 100);
+        }
+
+        // 停止更新時間
+        function stopTimeUpdate() {
+            if (currentInterval) {
+                clearInterval(currentInterval);
+                currentInterval = null;
+            }
+        }
+
+        // 更新當前歌詞
+        function updateActiveLyrics(currentTime) {
+            const lines = document.querySelectorAll('.lyrics-line');
+            lines.forEach((line, index) => {
+                const time = lyrics[index].time;
+                const nextTime = lyrics[index + 1]?.time || Infinity;
+                
+                if (currentTime >= time && currentTime < nextTime) {
+                    if (!line.classList.contains('active')) {
+                        line.classList.add('active');
+                        line.scrollIntoView({ 
+                            behavior: 'smooth', 
+                            block: 'center'
+                        });
+                    }
+                } else {
+                    line.classList.remove('active');
+                }
+            });
+        }
+
+        // 顯示歌詞
+        function displayLyrics() {
+            const lyricsDisplay = document.getElementById('lyricsDisplay');
+            lyricsDisplay.innerHTML = '';
+            
+            lyrics.forEach((item, index) => {
+                const div = document.createElement('div');
+                div.className = 'lyrics-line';
+
+                const loopBtn = document.createElement('button');
+                loopBtn.className = 'loop-btn';
+                loopBtn.innerHTML = '<i class="fas fa-sync-alt"></i>';
+                loopBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    startLooping(index);
+                };
+                div.appendChild(loopBtn);
+
+                const textSpan = document.createElement('span');
+                textSpan.className = 'lyrics-text';
+                textSpan.textContent = item.text;
+                textSpan.onclick = () => seekTo(item.time, index);
+                div.appendChild(textSpan);
+
+                lyricsDisplay.appendChild(div);
+            });
+        }
+
+        // 切換說明面板顯示狀態
+        function toggleHelp() {
+            const helpPanel = document.querySelector('.help-panel');
+            const backdrop = document.querySelector('.backdrop');
+            helpPanel.classList.toggle('show');
+            backdrop.classList.toggle('show');
+        }
+
+        // 點擊外部關閉說明面板
+        document.addEventListener('click', (e) => {
+            const helpPanel = document.querySelector('.help-panel');
+            const helpButton = document.querySelector('.help-button');
+            if (!helpPanel.contains(e.target) && !helpButton.contains(e.target)) {
+                helpPanel.classList.remove('show');
+                document.querySelector('.backdrop').classList.remove('show');
+            }
+        });
+
+        // 跳轉到指定時間
+        function seekTo(time, index) {
+            player.seekTo(time, true);
+            if (player.getPlayerState() !== YT.PlayerState.PLAYING) {
+                player.playVideo();
+            }
+
+            if (!isContinuousMode && index !== undefined) {
+                const currentLine = lyrics[index];
+                const nextLine = lyrics[index + 1];
+                
+                // 清除之前的計時器
+                if (window.pauseTimer) {
+                    clearTimeout(window.pauseTimer);
+                }
+
+                // 設置新的暫停計時器
+                window.pauseTimer = setTimeout(() => {
+                    if (!isContinuousMode) {
+                        const currentTime = player.getCurrentTime();
+                        const targetTime = nextLine ? nextLine.time : (currentLine.time + 5);
+                        
+                        if (currentTime >= targetTime) {
+                            player.pauseVideo();
+                        } else {
+                            const remainingTime = (targetTime - currentTime) * 1000;
+                            setTimeout(() => player.pauseVideo(), remainingTime);
+                        }
+                    }
+                }, (nextLine ? nextLine.time - time : 5) * 1000);
+            }
+        }
+
+        // 在模式切換時也要處理計時器
+        document.getElementById('modeToggle').addEventListener('change', function(e) {
+            isContinuousMode = e.target.checked;
+            
+            if (window.pauseTimer) {
+                clearTimeout(window.pauseTimer);
+            }
+            
+            if (!isContinuousMode && player && player.pauseVideo) {
+                player.pauseVideo();
+            }
+        });
+
+        // 初始化
+        loadYouTubeAPI();
+    </script>
+
+
+
+		</body>
+		</html>
